@@ -1,0 +1,68 @@
+setwd("C:/Rtest")
+install.packages(c('stringr','stringi','tm','sna','xml2','dplyr','qgraph'))
+
+library(KoNLP) 
+library(stringr); library(stringi);library(tm); library(sna);library(xml2);library(qgraph); library(dplyr)
+
+useSejongDic()
+
+f <- file("Titanic.txt", encoding="euc-kr")
+fl <- readLines(f)
+close(f) 
+
+{
+  fl <- gsub("그리고","",fl); fl <- gsub("너무","",fl); fl <- gsub("정말","",fl); 
+  fl <- gsub("진짜","",fl); fl <- gsub("그때","",fl); fl <- gsub("있는","",fl); fl <- gsub("을","",fl);fl <- gsub("를","",fl);
+  fl <- gsub("아는","",fl);fl <- gsub("하는","",fl);fl <- gsub("특히","",fl);fl <- gsub("역시","",fl); fl <- gsub("그냥","",fl);
+  fl <- gsub("여운이","",fl); fl <-gsub("영화는","",fl); fl <-gsub("별점","",fl); fl <-gsub("신고","",fl); 
+  fl <-gsub("봤습니다","",fl); fl <-gsub("이걸","",fl); fl <-gsub("같은","",fl)
+}
+
+fl <- str_replace_all(fl, "[[:punct:]]", "") %>% 
+  str_replace_all("배우[들의|들]", "배우")  %>%
+  str_replace_all("보고", "봤습니다")  %>%
+  str_replace_all("[0-9]+", " ")  %>%
+  str_replace_all("연기[는|가|력|도]", "연기") 
+  
+write.table(fl,"preprocessing1.txt") 
+
+f_1 <- file("preprocessing.txt", encoding="euc-kr")
+fl_1 <- readLines(f_1)
+close(f_1)
+
+fl_1
+ko.words = function(doc){              
+  doc = as.character(doc)              #문자열로 변환
+  doc2<-SimplePos22(doc)               #단어 품사를 22가지로 구분한 SimplePos22함수 적용
+  doc3<-str_match(doc2,"[가-힣]+/NC" ) #그 중 NC(보통명사)만 추출하는 정규식
+  doc4<-doc3[,2]                       #추출한 결과 중 단어만 있는 2열 추출
+  doc4[!is.na(doc4)]                   #추출한 결과 중 널(NA)값 삭제
+}
+
+options(mc.cores = 1)
+cps = Corpus(VectorSource(fl))
+tdm <- TermDocumentMatrix(cps, control = list(tokenize = ko.words, #토큰화하는데 위에서 만든 함수(ko.words)사용
+                                              removePunctuation=T,removeNumbers=T, #기호(Punctuation), 숫자 삭제
+                                              wordLengths=c(4,Inf)))
+result <- as.matrix(tdm)
+
+word.count = rowSums(result)
+word.order = order(word.count, decreasing = T)
+freq.word = result[word.order[1:10],]
+freq.word[,1]
+
+freqency <- data.frame(freq.word)
+write.csv(freqency,"Titanic1.csv") 
+
+co.matrix = freq.word %*% t(freq.word)
+co.matrix
+
+install.packages("qgraph")
+library(qgraph)
+
+qg<-qgraph(co.matrix,labels=rownames(co.matrix),
+           diag=F, layout='spring',
+           label.cex= 5.0,
+           edge.color='blue',
+           vsize=log(diag(co.matrix))*1.5)
+plot(qg)
