@@ -1,0 +1,90 @@
+setwd("C:/Rtest")
+install.packages(c('stringr','stringi','tm','sna','xml2','dplyr','qgraph'))
+
+library(KoNLP)
+library(stringr); library(stringi);library(tm); library(sna);library(xml2);library(qgraph); library(dplyr)
+
+useSejongDic()
+
+
+f <- file("socialstudies2015.txt", encoding="UTF-8") 
+fl <- readLines(f) 
+close(f)
+
+#불용어 처리
+{
+  fl <- gsub("는","",fl); fl <- gsub("의","",fl); fl <- gsub("에","",fl);
+  fl <- gsub("과","",fl); fl <- gsub("한다","",fl); fl <- gsub("이다","",fl);fl <- gsub("를","",fl);
+  fl <- gsub("등과","",fl);fl <- gsub("이","",fl);fl <- gsub("으로써","",fl);fl <- gsub("관한","",fl);
+  fl <- gsub("데","",fl); fl <- gsub("하고","",fl); fl <- gsub("하는","",fl); fl <- gsub("한","",fl); fl <- gsub("으로","",fl); 
+  fl <- gsub("와","",fl); fl <- gsub("나아가","",fl); fl <- gsub("물론","",fl); fl <- gsub("수","",fl); fl <- gsub("있는","",fl); 
+  fl <- gsub("있다","",fl); fl <- gsub("으로서","",fl); fl <- gsub("등에","",fl); fl <- gsub("하도록","",fl); fl <- gsub("또","",fl); 
+  fl <- gsub("또한","",fl); fl <- gsub("하여","",fl); fl <- gsub("대하여","",fl); fl <- gsub("한","",fl); fl <- gsub("으로","",fl); 
+  fl <- gsub("통해","",fl); fl <- gsub("등을","",fl); fl <- gsub("사항","",fl); fl <- gsub("활용","",fl); 
+  
+}
+
+#유사한 단어 처리
+fl <- str_replace_all(fl, "[[:punct:]]", "") %>%
+  str_replace_all("지리[적]", "지리") %>%
+  str_replace_all("개인[적]", "개인") %>%
+  str_replace_all("창의[적｜성]", "창의") %>%
+  str_replace_all("사회[적]", "사회") %>%
+  str_replace_all("역사[적]", "역사")
+
+
+
+write.table(fl,"preprocessing.txt")
+
+###전처리 완료된 파일 업로드
+f_1 <- file("preprocessing.txt", encoding="UTF-8")
+fl_1 <- readLines(f_1) 
+close(f_1) 
+
+fl_1
+#형태소 분석을 위한 ko.words 라는 이름의 함수를 정
+
+ko.words = function(doc){
+  doc = as.character(doc) 
+  doc2<-SimplePos22(doc)
+  doc3<-str_match(doc2,"[가-힣]+/NC" ) 
+  doc4[!is.na(doc4)] 
+}
+
+options(mc.cores = 1) 
+cps = Corpus(VectorSource(fl_1))
+
+#토큰화, ko.words 사용
+
+tdm <- TermDocumentMatrix(cps, control = list(tokenize = ko.words, 
+                                              removePunctuation=T,removeNumbers=T, 
+                                              wordLengths=c(4,Inf)))
+
+result <- as.matrix(tdm) 
+
+#핵심 키워드(최빈어) 찾기
+#상위빈도 15개 추출
+
+word.count = rowSums(result)
+word.order = order(word.count, decreasing = T)
+freq.word = result[word.order[1:15],]
+freq.word[,1]
+
+freqency <- data.frame(freq.word)
+write.csv(freqency,"socialstudies2015.csv") 
+
+#전치행렬로 바꾼 다음에 곱셈을 통해 공출현 행렬
+co.matrix = freq.word %*% t(freq.word)
+co.matrix
+
+####공출현 행렬을 그래프로 그리기
+install.packages("qgraph")
+library(qgraph)
+
+qg<-qgraph(co.matrix,labels=rownames(co.matrix), 
+           diag=F, layout='spring', 
+           label.cex= 2.1, 
+           edge.color='green', 
+           vsize=log(diag(co.matrix))*1.5) 
+
+qplot(qg) 
